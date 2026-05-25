@@ -129,8 +129,8 @@ def build_main_view(
     nome_input.on_change = atualizar_sugestoes
 
     acompanhantes_dd = ft.Dropdown(
-        label="Acompanhantes",
-        width=150,
+        label="Acomp.",
+        width=112,
         value="0",
         options=[
             ft.dropdown.Option("0"),
@@ -309,10 +309,13 @@ def build_main_view(
         except Exception as ex:
             show_snack(f"Erro no fechamento: {ex}", ok=False)
 
-    def top_action_button(label: str, icon, on_click, icon_color=None) -> ft.Control:
+    def top_action_button(
+        label: str, icon, on_click, icon_color=None, tooltip: str | None = None
+    ) -> ft.Control:
         return ft.Container(
-            height=44,
-            padding=ft.padding.symmetric(horizontal=14, vertical=0),
+            height=38,
+            tooltip=tooltip or label,
+            padding=ft.padding.symmetric(horizontal=10, vertical=0),
             bgcolor=Colors.WHITE,
             border_radius=8,
             border=ft.border.all(1, Colors.OUTLINE_VARIANT),
@@ -325,7 +328,7 @@ def build_main_view(
                     ft.Icon(icon, size=18, color=icon_color or Colors.BLUE_900),
                     ft.Text(
                         label,
-                        size=14,
+                        size=12,
                         weight=FontWeight.W_700,
                         color=Colors.BLUE_900,
                     ),
@@ -337,14 +340,16 @@ def build_main_view(
         spacing=8,
         controls=[
             top_action_button(
-                "Lista Backup",
+                "Backup",
                 Icons.DESCRIPTION,
                 relatorio_lista_chamada_backup,
+                tooltip="Gerar lista de chamada backup",
             ),
             top_action_button(
-                "Fechamento",
+                "Fech.",
                 Icons.SUMMARIZE,
                 relatorio_fechamento_gira,
+                tooltip="Gerar fechamento da gira",
             ),
         ],
     )
@@ -386,10 +391,11 @@ def build_main_view(
         page.show_dialog(confirm_dialog)
 
     zerar_btn = top_action_button(
-        "Zerar dia",
+        "Zerar",
         Icons.DELETE_SWEEP,
         ask_reset_day,
         Colors.RED_700,
+        tooltip="Zerar senhas do dia",
     )
 
     # -------- TV --------
@@ -400,9 +406,10 @@ def build_main_view(
             show_snack(f"Não consegui abrir a TV: {ex}", ok=False)
 
     tv_btn = top_action_button(
-        "Abrir TV",
+        "TV",
         Icons.LIVE_TV,
         abrir_tv,
+        tooltip="Abrir painel da TV",
     )
     tv_btn.visible = IS_SERVER
 
@@ -453,8 +460,9 @@ def build_main_view(
         set_work_date(date.today())
 
     date_selector = ft.Container(
-        height=44,
-        padding=ft.padding.symmetric(horizontal=10, vertical=4),
+        height=38,
+        tooltip="Data de trabalho",
+        padding=ft.padding.symmetric(horizontal=8, vertical=2),
         border_radius=8,
         bgcolor=Colors.WHITE,
         border=ft.border.all(1, Colors.OUTLINE_VARIANT),
@@ -462,12 +470,6 @@ def build_main_view(
             spacing=4,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
-                ft.Text(
-                    "Data",
-                    size=11,
-                    weight=FontWeight.W_700,
-                    color=Colors.BLUE_900,
-                ),
                 ft.IconButton(
                     Icons.CHEVRON_LEFT,
                     tooltip="Dia anterior",
@@ -489,7 +491,7 @@ def build_main_view(
                     tooltip="Próximo dia",
                     on_click=next_day,
                 ),
-                ft.TextButton("Hoje", on_click=today),
+                ft.IconButton(Icons.TODAY, tooltip="Hoje", on_click=today),
             ],
         ),
     )
@@ -555,8 +557,9 @@ def build_main_view(
     )
 
     triagem_summary = ft.Container(
-        height=44,
-        padding=ft.padding.symmetric(horizontal=12, vertical=4),
+        height=38,
+        tooltip="Total em triagem",
+        padding=ft.padding.symmetric(horizontal=10, vertical=2),
         border_radius=8,
         bgcolor=Colors.WHITE,
         border=ft.border.all(1, Colors.OUTLINE_VARIANT),
@@ -593,7 +596,7 @@ def build_main_view(
     aus_list = ft.ListView(spacing=8, expand=True)
 
     imprimir_ao_gerar = ft.Switch(
-        label="Imprimir ao gerar", value=True, visible=IS_SERVER
+        label="Imp.", tooltip="Imprimir ao gerar", value=True, visible=IS_SERVER
     )
 
     def criar_na_fila(fila_code: str):
@@ -623,60 +626,57 @@ def build_main_view(
         except Exception as ex:
             show_snack(f"Erro ao gerar: {ex}", ok=False)
 
-    def criar_btn(label: str, icon, fila_code: str, bgcolor, color) -> ft.Control:
+    def criar_btn(
+        label: str, icon, fila_code: str, bgcolor, color, tooltip: str
+    ) -> ft.Control:
         return ft.ElevatedButton(
             label,
             icon=icon,
             bgcolor=bgcolor,
             color=color,
-            height=44,
+            tooltip=tooltip,
+            height=40,
+            width=88,
             on_click=lambda e: criar_na_fila(fila_code),
         )
 
     create_panel = ft.Container(
-        padding=14,
+        padding=ft.padding.symmetric(horizontal=14, vertical=8),
         border_radius=8,
         bgcolor=Colors.WHITE,
         border=ft.border.all(1, Colors.OUTLINE_VARIANT),
-        content=ft.Column(
-            spacing=12,
+        content=ft.Row(
+            spacing=8,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
-                ft.Row(
-                    spacing=8,
-                    controls=[
-                        ft.Icon(Icons.ADD_CIRCLE_OUTLINE, color=Colors.BLUE_900),
-                        ft.Text("Nova senha", size=16, weight=FontWeight.W_800),
-                    ],
+                ft.Icon(Icons.ADD_CIRCLE_OUTLINE, color=Colors.BLUE_900),
+                ft.Text("Nova senha", size=14, weight=FontWeight.W_800, width=92),
+                nome_box,
+                acompanhantes_dd,
+                imprimir_ao_gerar,
+                criar_btn(
+                    "N",
+                    Icons.PEOPLE_ALT,
+                    "N",
+                    Colors.BLUE_100,
+                    Colors.BLUE_900,
+                    "Gerar senha normal",
                 ),
-                ft.Row(
-                    spacing=10,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    controls=[
-                        nome_box,
-                        acompanhantes_dd,
-                        imprimir_ao_gerar,
-                        criar_btn(
-                            "Normal",
-                            Icons.PEOPLE_ALT,
-                            "N",
-                            Colors.BLUE_100,
-                            Colors.BLUE_900,
-                        ),
-                        criar_btn(
-                            "Preferencial",
-                            Icons.STAR,
-                            "P",
-                            Colors.AMBER_100,
-                            Colors.AMBER_900,
-                        ),
-                        criar_btn(
-                            "Espera",
-                            Icons.HOURGLASS_BOTTOM,
-                            "E",
-                            Colors.PURPLE_100,
-                            Colors.PURPLE_900,
-                        ),
-                    ],
+                criar_btn(
+                    "P",
+                    Icons.STAR,
+                    "P",
+                    Colors.AMBER_100,
+                    Colors.AMBER_900,
+                    "Gerar senha preferencial",
+                ),
+                criar_btn(
+                    "E",
+                    Icons.HOURGLASS_BOTTOM,
+                    "E",
+                    Colors.PURPLE_100,
+                    Colors.PURPLE_900,
+                    "Gerar senha de espera",
                 ),
             ],
         ),
@@ -963,15 +963,18 @@ def build_main_view(
 
     # -------- Topbar + Layout --------
     topbar = ft.Container(
-        padding=14,
+        padding=ft.padding.symmetric(horizontal=14, vertical=8),
         border_radius=8,
         bgcolor=HEADER_BG,
         border=ft.border.all(1, Colors.OUTLINE_VARIANT),
-        content=ft.Column(
-            spacing=12,
+        content=ft.Row(
+            spacing=10,
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
                 ft.Row(
-                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    spacing=10,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     controls=[
                         ft.Row(
                             spacing=12,
@@ -979,20 +982,22 @@ def build_main_view(
                             controls=[
                                 ft.Image(
                                     src=LOGO_SRC,
-                                    width=44 if is_mobile() else 52,
-                                    height=44 if is_mobile() else 52,
+                                    width=34,
+                                    height=34,
                                     fit="contain",
                                 ),
                                 ft.Text(
                                     "Casa da Vovó Joaquina",
-                                    size=16 if is_mobile() else 22,
+                                    size=18,
                                     weight=FontWeight.W_900,
                                     color=Colors.WHITE,
                                 ),
                             ],
                         ),
                         ft.Container(
-                            padding=ft.padding.symmetric(horizontal=10, vertical=4),
+                            height=28,
+                            tooltip="Modo servidor" if IS_SERVER else "Terminal cliente",
+                            padding=ft.padding.symmetric(horizontal=9, vertical=2),
                             border_radius=8,
                             bgcolor=Colors.BLUE_50 if IS_SERVER else Colors.GREY_100,
                             border=ft.border.all(
@@ -1003,15 +1008,13 @@ def build_main_view(
                                 controls=[
                                     ft.Icon(
                                         Icons.COMPUTER,
-                                        size=14,
+                                        size=13,
                                         color=Colors.BLUE_900
                                         if IS_SERVER
                                         else Colors.GREY_700,
                                     ),
                                     ft.Text(
-                                        "Modo servidor"
-                                        if IS_SERVER
-                                        else "Terminal cliente",
+                                        "Servidor" if IS_SERVER else "Cliente",
                                         size=11,
                                         weight=FontWeight.W_700,
                                         color=Colors.BLUE_900
