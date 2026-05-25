@@ -340,10 +340,10 @@ def build_main_view(
         spacing=8,
         controls=[
             top_action_button(
-                "Backup",
+                "Lista",
                 Icons.DESCRIPTION,
                 relatorio_lista_chamada_backup,
-                tooltip="Gerar lista de chamada backup",
+                tooltip="Gerar lista de chamada",
             ),
             top_action_button(
                 "Fech.",
