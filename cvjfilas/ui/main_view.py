@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import os
+import socket
 from datetime import date, datetime, timedelta
 import flet as ft
 
 from services.database_service import DatabaseService
 from services.print_service import PrintService
 
-from ..core.constants import IS_SERVER, LOGO_SRC, HIDE_STATUSES
+from ..core.constants import APP_PORT, IS_SERVER, LOGO_SRC, HIDE_STATUSES
 from ..core.ui_utils import fila_label, status_label, status_color
 
 
@@ -34,6 +35,18 @@ def build_main_view(
 
     device = os.getenv("COMPUTERNAME", "TERMINAL")
     state = {"work_date": date.today()}
+
+    def server_address_label() -> str:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))
+                ip = s.getsockname()[0]
+        except Exception:
+            try:
+                ip = socket.gethostbyname(socket.gethostname())
+            except Exception:
+                ip = "127.0.0.1"
+        return f"{ip}:{APP_PORT}"
 
     def is_mobile() -> bool:
         w = page.width
@@ -1020,7 +1033,11 @@ def build_main_view(
                         ),
                         ft.Container(
                             height=28,
-                            tooltip="Modo servidor" if IS_SERVER else "Terminal cliente",
+                            tooltip=(
+                                "Endereco do servidor"
+                                if IS_SERVER
+                                else "Terminal cliente"
+                            ),
                             padding=ft.padding.symmetric(horizontal=9, vertical=2),
                             border_radius=8,
                             bgcolor=Colors.BLUE_50 if IS_SERVER else Colors.GREY_100,
@@ -1038,7 +1055,7 @@ def build_main_view(
                                         else Colors.GREY_700,
                                     ),
                                     ft.Text(
-                                        "Servidor" if IS_SERVER else "Cliente",
+                                        server_address_label() if IS_SERVER else "Cliente",
                                         size=11,
                                         weight=FontWeight.W_700,
                                         color=Colors.BLUE_900
