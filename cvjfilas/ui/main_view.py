@@ -691,14 +691,18 @@ def build_main_view(
         )
 
         badge = ft.Container(
-            padding=ft.padding.symmetric(horizontal=8, vertical=3),
+            width=76,
+            padding=ft.padding.symmetric(horizontal=6, vertical=3),
             bgcolor=status_color(st),
             border_radius=8,
             content=ft.Text(
                 status_label(st),
-                size=11,
+                size=10,
                 weight=FontWeight.W_700,
                 color=Colors.BLACK,
+                text_align=ft.TextAlign.CENTER,
+                max_lines=1,
+                overflow=ft.TextOverflow.ELLIPSIS,
             ),
         )
 
@@ -741,18 +745,30 @@ def build_main_view(
             nome_exibicao = f"{nome_exibicao} +{acomp}"
 
         is_nao_apareceu = (t.get("fila") or "").upper() == "A"
+
+        def card_action_button(icon, tooltip: str, on_click, disabled: bool = False):
+            return ft.IconButton(
+                icon,
+                tooltip=tooltip,
+                on_click=on_click,
+                disabled=disabled,
+                icon_size=18,
+                width=30,
+                height=30,
+            )
+
         action_controls = [
-            ft.IconButton(
+            card_action_button(
                 Icons.CAMPAIGN,
-                tooltip="Chamar",
-                on_click=on_call,
-                disabled=st in ("X", "D", "F"),
+                "Chamar",
+                on_call,
+                st in ("X", "D", "F"),
             ),
-            ft.IconButton(
+            card_action_button(
                 Icons.CHECK_CIRCLE,
-                tooltip="Concluir",
-                on_click=on_confirm,
-                disabled=st in ("X", "D", "F"),
+                "Concluir",
+                on_confirm,
+                st in ("X", "D", "F"),
             ),
         ]
         if not is_nao_apareceu:
@@ -773,9 +789,18 @@ def build_main_view(
             )
         )
 
-        actions = ft.Row(
-            spacing=2,
-            controls=action_controls,
+        for action_btn in action_controls:
+            action_btn.icon_size = 18
+            action_btn.width = 30
+            action_btn.height = 30
+
+        actions = ft.Container(
+            width=122 if not is_nao_apareceu else 92,
+            content=ft.Row(
+                spacing=0,
+                alignment=ft.MainAxisAlignment.END,
+                controls=action_controls,
+            ),
         )
 
         return ft.Container(
@@ -794,15 +819,15 @@ def build_main_view(
                                 spacing=8,
                                 controls=[
                                     ft.Container(
-                                        width=74,
+                                        width=64,
                                         padding=ft.padding.symmetric(
-                                            horizontal=8, vertical=8
+                                            horizontal=6, vertical=8
                                         ),
                                         border_radius=8,
                                         bgcolor=Colors.BLUE_GREY_50,
                                         content=ft.Text(
                                             str(t.get("senha", "-")),
-                                            size=18,
+                                            size=16,
                                             weight=FontWeight.W_900,
                                             text_align=ft.TextAlign.CENTER,
                                         ),
