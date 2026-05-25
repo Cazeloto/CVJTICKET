@@ -691,12 +691,6 @@ def build_main_view(
 
     def ticket_card(t: dict) -> ft.Control:
         st = t.get("status", "W")
-        border = (
-            ft.border.all(2, Colors.AMBER)
-            if st == "C"
-            else ft.border.all(1, Colors.OUTLINE_VARIANT)
-        )
-
         status_dot_color = {
             "W": Colors.AMBER,
             "C": Colors.GREEN,
@@ -704,6 +698,7 @@ def build_main_view(
             "D": Colors.BLUE,
             "X": Colors.RED,
         }.get(st, Colors.GREY)
+        border = ft.border.all(2 if st == "C" else 1.5, status_dot_color)
         status_dot = ft.Container(
             width=14,
             height=14,
