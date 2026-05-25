@@ -62,6 +62,14 @@ def build_main_view(
         except Exception as ex:
             show_snack(f"Não consegui abrir o arquivo: {ex}", ok=False)
 
+    def print_file(path: str) -> bool:
+        try:
+            os.startfile(path, "print")
+            return True
+        except Exception as ex:
+            show_snack(f"Nao consegui imprimir automaticamente: {ex}", ok=False)
+            return False
+
     # -------- Entrada única de nome --------
     nome_input = ft.TextField(
         label="Nome do consulente",
@@ -627,7 +635,7 @@ def build_main_view(
                 pdf_path = printer.gerar_senha_a6_pdf(
                     ticket=t, work_date=state["work_date"], incluir_qr=True
                 )
-                open_file(pdf_path)
+                print_file(pdf_path)
             refresh()
             show_snack(f"Senha gerada: {t.get('senha')} ({fila_label_ui(fila_code)})")
         except Exception as ex:
