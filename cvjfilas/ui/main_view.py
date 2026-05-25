@@ -903,30 +903,21 @@ def build_main_view(
             bgcolor=bg,
             ink=allow_create,
             on_click=(lambda e: criar_na_fila(fila_code)) if allow_create else None,
-            content=ft.Column(
+            content=ft.Row(
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=8,
                 controls=[
                     ft.Row(
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                         spacing=8,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         controls=[
-                            ft.Row(
-                                spacing=8,
-                                controls=[
-                                    ft.Icon(icon, color=icc),
-                                    ft.Text(
-                                        title,
-                                        size=15,
-                                        weight=FontWeight.W_900,
-                                        color=tx,
-                                    ),
-                                ],
-                            ),
+                            ft.Icon(icon, color=icc),
                             ft.Text(
-                                "Adicionar" if allow_create else "Registro",
-                                size=11,
-                                weight=FontWeight.W_700,
-                                color=icc,
+                                title,
+                                size=15,
+                                weight=FontWeight.W_900,
+                                color=tx,
                             ),
                         ],
                     ),
