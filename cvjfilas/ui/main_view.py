@@ -697,20 +697,20 @@ def build_main_view(
             else ft.border.all(1, Colors.OUTLINE_VARIANT)
         )
 
-        badge = ft.Container(
-            width=82,
-            padding=ft.padding.symmetric(horizontal=6, vertical=3),
-            bgcolor=status_color(st),
-            border_radius=8,
-            content=ft.Text(
-                status_label(st),
-                size=11,
-                weight=FontWeight.W_700,
-                color=Colors.BLACK,
-                text_align=ft.TextAlign.CENTER,
-                max_lines=1,
-                overflow=ft.TextOverflow.ELLIPSIS,
-            ),
+        status_dot_color = {
+            "W": Colors.AMBER,
+            "C": Colors.GREEN,
+            "F": Colors.BLUE,
+            "D": Colors.BLUE,
+            "X": Colors.RED,
+        }.get(st, Colors.GREY)
+        status_dot = ft.Container(
+            width=14,
+            height=14,
+            tooltip=status_label(st),
+            border_radius=7,
+            bgcolor=status_dot_color,
+            border=ft.border.all(1, Colors.WHITE),
         )
 
         def on_call(e):
@@ -813,27 +813,34 @@ def build_main_view(
             border=border,
             bgcolor=Colors.WHITE,
             content=ft.Column(
-                spacing=7,
+                spacing=6,
                 controls=[
                     ft.Row(
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         controls=[
-                            ft.Container(
-                                width=70,
-                                padding=ft.padding.symmetric(
-                                    horizontal=6, vertical=8
-                                ),
-                                border_radius=8,
-                                bgcolor=Colors.BLUE_GREY_50,
-                                content=ft.Text(
-                                    str(t.get("senha", "-")),
-                                    size=16,
-                                    weight=FontWeight.W_900,
-                                    text_align=ft.TextAlign.CENTER,
-                                ),
+                            ft.Row(
+                                spacing=8,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                controls=[
+                                    ft.Container(
+                                        width=70,
+                                        padding=ft.padding.symmetric(
+                                            horizontal=6, vertical=8
+                                        ),
+                                        border_radius=8,
+                                        bgcolor=Colors.BLUE_GREY_50,
+                                        content=ft.Text(
+                                            str(t.get("senha", "-")),
+                                            size=16,
+                                            weight=FontWeight.W_900,
+                                            text_align=ft.TextAlign.CENTER,
+                                        ),
+                                    ),
+                                    status_dot,
+                                ],
                             ),
-                            badge,
+                            actions,
                         ],
                     ),
                     ft.Text(
@@ -843,7 +850,6 @@ def build_main_view(
                         max_lines=1,
                         overflow=ft.TextOverflow.ELLIPSIS,
                     ),
-                    actions,
                 ],
             ),
         )
