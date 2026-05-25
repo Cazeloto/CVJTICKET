@@ -46,7 +46,8 @@ def build_main_view(
                 ip = socket.gethostbyname(socket.gethostname())
             except Exception:
                 ip = "127.0.0.1"
-        return f"{ip}:{APP_PORT}"
+        port = os.getenv("APP_PORT", str(APP_PORT)).strip() or str(APP_PORT)
+        return f"http://{ip}:{port}"
 
     def is_mobile() -> bool:
         w = page.width
