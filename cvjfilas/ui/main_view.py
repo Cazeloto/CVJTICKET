@@ -39,12 +39,19 @@ def build_main_view(
         w = page.width
         return True if w is None else w < 900
 
+    def safe_page_update() -> bool:
+        try:
+            page.update()
+            return True
+        except Exception:
+            return False
+
     def show_snack(msg: str, ok: bool = True):
         page.snack_bar = ft.SnackBar(
             ft.Text(msg), bgcolor=(Colors.GREEN if ok else Colors.RED)
         )
         page.snack_bar.open = True
-        page.update()
+        safe_page_update()
 
     def format_work_date() -> str:
         return state["work_date"].strftime("%d/%m/%Y")
@@ -88,13 +95,13 @@ def build_main_view(
     def selecionar_sugestao(nome: str):
         nome_input.value = (nome or "").strip()
         esconder_sugestoes()
-        page.update()
+        safe_page_update()
 
     def atualizar_sugestoes(e=None):
         termo = (nome_input.value or "").strip()
         if len(termo) < 2:
             esconder_sugestoes()
-            page.update()
+            safe_page_update()
             return
 
         try:
@@ -104,7 +111,7 @@ def build_main_view(
 
         if not sugestoes:
             esconder_sugestoes()
-            page.update()
+            safe_page_update()
             return
 
         sugestoes_nomes.content.controls = [
@@ -124,7 +131,7 @@ def build_main_view(
             for item in sugestoes
         ]
         sugestoes_nomes.visible = True
-        page.update()
+        safe_page_update()
 
     nome_input.on_change = atualizar_sugestoes
 
@@ -362,7 +369,7 @@ def build_main_view(
             page.pop_dialog()
         except Exception:
             confirm_dialog.open = False
-        page.update()
+        safe_page_update()
 
     def do_reset_day(e=None):
         try:
@@ -691,13 +698,13 @@ def build_main_view(
         )
 
         badge = ft.Container(
-            width=76,
+            width=82,
             padding=ft.padding.symmetric(horizontal=6, vertical=3),
             bgcolor=status_color(st),
             border_radius=8,
             content=ft.Text(
                 status_label(st),
-                size=10,
+                size=11,
                 weight=FontWeight.W_700,
                 color=Colors.BLACK,
                 text_align=ft.TextAlign.CENTER,
@@ -752,9 +759,9 @@ def build_main_view(
                 tooltip=tooltip,
                 on_click=on_click,
                 disabled=disabled,
-                icon_size=18,
-                width=30,
-                height=30,
+                icon_size=19,
+                width=34,
+                height=32,
             )
 
         action_controls = [
@@ -790,17 +797,14 @@ def build_main_view(
         )
 
         for action_btn in action_controls:
-            action_btn.icon_size = 18
-            action_btn.width = 30
-            action_btn.height = 30
+            action_btn.icon_size = 19
+            action_btn.width = 34
+            action_btn.height = 32
 
-        actions = ft.Container(
-            width=122 if not is_nao_apareceu else 92,
-            content=ft.Row(
-                spacing=0,
-                alignment=ft.MainAxisAlignment.END,
-                controls=action_controls,
-            ),
+        actions = ft.Row(
+            spacing=2,
+            alignment=ft.MainAxisAlignment.END,
+            controls=action_controls,
         )
 
         return ft.Container(
@@ -809,42 +813,37 @@ def build_main_view(
             border=border,
             bgcolor=Colors.WHITE,
             content=ft.Column(
-                spacing=8,
+                spacing=7,
                 controls=[
                     ft.Row(
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         controls=[
-                            ft.Row(
-                                spacing=8,
-                                controls=[
-                                    ft.Container(
-                                        width=64,
-                                        padding=ft.padding.symmetric(
-                                            horizontal=6, vertical=8
-                                        ),
-                                        border_radius=8,
-                                        bgcolor=Colors.BLUE_GREY_50,
-                                        content=ft.Text(
-                                            str(t.get("senha", "-")),
-                                            size=16,
-                                            weight=FontWeight.W_900,
-                                            text_align=ft.TextAlign.CENTER,
-                                        ),
-                                    ),
-                                    badge,
-                                ],
+                            ft.Container(
+                                width=70,
+                                padding=ft.padding.symmetric(
+                                    horizontal=6, vertical=8
+                                ),
+                                border_radius=8,
+                                bgcolor=Colors.BLUE_GREY_50,
+                                content=ft.Text(
+                                    str(t.get("senha", "-")),
+                                    size=16,
+                                    weight=FontWeight.W_900,
+                                    text_align=ft.TextAlign.CENTER,
+                                ),
                             ),
-                            actions,
+                            badge,
                         ],
                     ),
                     ft.Text(
                         nome_exibicao,
-                        size=17,
+                        size=16,
                         weight=FontWeight.W_900,
                         max_lines=1,
                         overflow=ft.TextOverflow.ELLIPSIS,
                     ),
+                    actions,
                 ],
             ),
         )
@@ -1087,7 +1086,7 @@ def build_main_view(
             all_items = db.list_tickets(state["work_date"])
         except Exception as ex:
             show_snack(f"Erro lendo do banco: {ex}", ok=False)
-            return
+            return False
 
         abertos = [t for t in all_items if t.get("status") in ("W", "C")]
         concluidos = [t for t in all_items if t.get("status") in ("F", "D")]
@@ -1131,7 +1130,7 @@ def build_main_view(
         esp_list.controls = [ticket_card(t) for t in by["E"]]
         aus_list.controls = [ticket_card(t) for t in by["A"]]
 
-        page.update()
+        return safe_page_update()
 
     async def auto_refresh():
         while True:
@@ -1139,14 +1138,15 @@ def build_main_view(
                 await asyncio.sleep(0.8)
                 continue
             try:
-                refresh()
+                if refresh() is False:
+                    break
             except Exception:
-                pass
+                break
             await asyncio.sleep(1.5)
 
     def on_resize(e):
         apply_layout()
-        page.update()
+        safe_page_update()
 
     page.on_resize = on_resize
 
