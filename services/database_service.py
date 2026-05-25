@@ -138,6 +138,62 @@ class DatabaseService:
     # Ticket CRUD
     # -------------------------
 
+    def search_consulentes(self, termo: str, limit: int = 8) -> List[Dict[str, Any]]:
+        termo = (termo or "").strip()
+        if len(termo) < 2:
+            return []
+        try:
+            limit = int(limit or 8)
+        except Exception:
+            limit = 8
+        limit = max(1, min(limit, 20))
+
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    select id, nome, documento, telefone, created_at
+                    from consulente
+                    where nome ilike %s
+                    order by
+                      case when nome ilike %s then 0 else 1 end,
+                      nome asc
+                    limit %s
+                    """,
+                    (f"%{termo}%", f"{termo}%", limit),
+                )
+                return cur.fetchall()
+
+    def _get_or_create_consulente(
+        self, cur: psycopg.Cursor, nome: str
+    ) -> Dict[str, Any]:
+        nome = (nome or "").strip()
+        nome_key = " ".join(nome.split()).lower()
+        cur.execute("select pg_advisory_xact_lock(hashtext(%s))", (nome_key,))
+        cur.execute(
+            """
+            select id, nome, documento, telefone, created_at
+            from consulente
+            where lower(regexp_replace(trim(nome), '\\s+', ' ', 'g')) = %s
+            order by id asc
+            limit 1
+            """,
+            (nome_key,),
+        )
+        row = cur.fetchone()
+        if row:
+            return row
+
+        cur.execute(
+            """
+            insert into consulente (nome)
+            values (%s)
+            returning id, nome, documento, telefone, created_at
+            """,
+            (nome,),
+        )
+        return cur.fetchone()
+
     def _parse_notes_dict(self, notes: Any) -> Dict[str, Any]:
         if notes is None:
             return {}
@@ -202,6 +258,7 @@ class DatabaseService:
                 with conn.cursor() as cur:
                     wd = self.get_or_create_workday(work_date)
                     workday_id = int(wd["id"])
+                    consulente = self._get_or_create_consulente(cur, nome)
 
                     seq = self._next_seq_by_fila(cur, workday_id, fila)
                     senha = _senha_texto(fila, seq)
@@ -209,17 +266,18 @@ class DatabaseService:
                     cur.execute(
                         """
                         insert into ticket (
-                          workday_id, nome_livre, fila, categoria, seq, senha,
+                          workday_id, consulente_id, nome_livre, fila, categoria, seq, senha,
                           status, origin_device, offline_id, notes
                         )
-                        values (%s, %s, %s, %s, %s, %s, 'W', %s, %s, %s)
+                        values (%s, %s, %s, %s, %s, %s, %s, 'W', %s, %s, %s)
                         returning
-                          id, workday_id, nome_livre, fila, categoria, seq, senha, status,
+                          id, workday_id, consulente_id, nome_livre, fila, categoria, seq, senha, status,
                           called_at, confirmed_at, finished_at, notes,
                           origin_device, offline_id, created_at, updated_at
                         """,
                         (
                             workday_id,
+                            consulente["id"],
                             nome,
                             fila,
                             categoria,
@@ -267,7 +325,7 @@ class DatabaseService:
                 cur.execute(
                     """
                     select
-                      id, workday_id, nome_livre, fila, categoria, seq, senha, status,
+                      id, workday_id, consulente_id, nome_livre, fila, categoria, seq, senha, status,
                       called_at, confirmed_at, finished_at, notes,
                       origin_device, offline_id, created_at, updated_at
                     from ticket

@@ -18,6 +18,8 @@ create table if not exists consulente (
   created_at      timestamptz not null default now()
 );
 
+create index if not exists idx_consulente_nome_lower on consulente(lower(nome));
+
 -- enums "simulados" via check (compatível com PG 10)
 -- fila: N=Normal, P=Preferencial, E=Espera, A=Não apareceu
 -- categoria: N=Normal, R=Prioritário

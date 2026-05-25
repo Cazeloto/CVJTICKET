@@ -58,10 +58,75 @@ def build_main_view(
     # -------- Entrada única de nome --------
     nome_input = ft.TextField(
         label="Nome do consulente",
-        hint_text="Digite o nome e clique na fila",
+        hint_text="Digite qualquer parte do nome",
         expand=True,
         autofocus=True,
     )
+
+    sugestoes_nomes = ft.Container(
+        visible=False,
+        bgcolor=Colors.WHITE,
+        border=ft.border.all(1, Colors.OUTLINE_VARIANT),
+        border_radius=8,
+        padding=4,
+        content=ft.Column(tight=True, spacing=0, controls=[]),
+    )
+
+    nome_box = ft.Container(
+        expand=True,
+        content=ft.Column(
+            tight=True,
+            spacing=4,
+            controls=[nome_input, sugestoes_nomes],
+        ),
+    )
+
+    def esconder_sugestoes():
+        sugestoes_nomes.visible = False
+        sugestoes_nomes.content.controls = []
+
+    def selecionar_sugestao(nome: str):
+        nome_input.value = (nome or "").strip()
+        esconder_sugestoes()
+        page.update()
+
+    def atualizar_sugestoes(e=None):
+        termo = (nome_input.value or "").strip()
+        if len(termo) < 2:
+            esconder_sugestoes()
+            page.update()
+            return
+
+        try:
+            sugestoes = db.search_consulentes(termo, limit=6)
+        except Exception:
+            sugestoes = []
+
+        if not sugestoes:
+            esconder_sugestoes()
+            page.update()
+            return
+
+        sugestoes_nomes.content.controls = [
+            ft.Container(
+                padding=ft.padding.symmetric(horizontal=10, vertical=7),
+                border_radius=6,
+                ink=True,
+                on_click=lambda e, nome=item["nome"]: selecionar_sugestao(nome),
+                content=ft.Row(
+                    spacing=8,
+                    controls=[
+                        ft.Icon(Icons.PERSON_SEARCH, size=16, color=Colors.BLUE_700),
+                        ft.Text(str(item["nome"]), size=13, weight=FontWeight.W_600),
+                    ],
+                ),
+            )
+            for item in sugestoes
+        ]
+        sugestoes_nomes.visible = True
+        page.update()
+
+    nome_input.on_change = atualizar_sugestoes
 
     acompanhantes_dd = ft.Dropdown(
         label="Acompanhantes",
@@ -546,6 +611,7 @@ def build_main_view(
                 acompanhantes=int(acompanhantes_dd.value or "0"),
             )
             nome_input.value = ""
+            esconder_sugestoes()
             acompanhantes_dd.value = "0"
             if IS_SERVER and imprimir_ao_gerar.value:
                 pdf_path = printer.gerar_senha_a6_pdf(
@@ -586,7 +652,7 @@ def build_main_view(
                     spacing=10,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     controls=[
-                        nome_input,
+                        nome_box,
                         acompanhantes_dd,
                         imprimir_ao_gerar,
                         criar_btn(
