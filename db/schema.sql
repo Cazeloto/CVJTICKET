@@ -19,6 +19,8 @@ create table if not exists consulente (
 );
 
 create index if not exists idx_consulente_nome_lower on consulente(lower(nome));
+create extension if not exists pg_trgm;
+create index if not exists idx_consulente_nome_trgm on consulente using gin (lower(nome) gin_trgm_ops);
 
 -- enums "simulados" via check (compatível com PG 10)
 -- fila: N=Normal, P=Preferencial, E=Espera, A=Não apareceu
@@ -58,6 +60,7 @@ create table if not exists ticket (
 
 create index if not exists idx_ticket_day_queue_status on ticket(workday_id, fila, status);
 create index if not exists idx_ticket_day_created_at on ticket(workday_id, created_at);
+create index if not exists idx_ticket_day_fila_seq on ticket(workday_id, fila, seq);
 
 -- 3) Eventos (auditoria / sincronização / diagnóstico)
 create table if not exists ticket_event (

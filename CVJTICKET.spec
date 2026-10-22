@@ -32,7 +32,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    version='C:\\Users\\gerso\\AppData\\Local\\Temp\\dad1eaf4-9ec8-4a34-843b-ac64e6327b36',
+    version='C:\\Users\\gerso\\AppData\\Local\\Temp\\749e6a6f-786a-4e50-80ea-8f91ebe9614a',
 )
 coll = COLLECT(
     exe,

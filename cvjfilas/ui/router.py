@@ -7,7 +7,9 @@ from services.database_service import DatabaseService
 from services.print_service import PrintService
 
 from .main_view import build_main_view
+from .mobile_view import build_mobile_call, build_mobile_registration
 from .tv_view import build_tv_view
+
 
 
 def app(page: ft.Page):
@@ -55,11 +57,16 @@ def app(page: ft.Page):
     def route_change(e=None):
         try:
             raw = page.route or "/"
-            r = raw.rstrip("/") or "/"
+            r = raw.split("?", 1)[0].rstrip("/") or "/"
+            route_key = r.lower()
 
             page.views.clear()
-            if r == "/tv":
+            if route_key == "/tv":
                 v = build_tv_view(page, db)
+            elif route_key == "/celular/cadastro":
+                v = build_mobile_registration(page, db, printer)
+            elif route_key in ("/celular", "/celular/chamada"):
+                v = build_mobile_call(page, db, printer)
             else:
                 v = build_main_view(page, db, printer)
 

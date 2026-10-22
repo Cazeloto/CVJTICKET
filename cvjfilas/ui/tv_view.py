@@ -17,6 +17,12 @@ def build_tv_view(page: ft.Page, db: DatabaseService) -> ft.View:
     Icons = getattr(ft, "Icons", ft.icons)
     FontWeight = getattr(ft, "FontWeight", ft.FontWeight)
     voice = VoiceService()
+    state = {"active": True}
+
+    def on_disconnect(e=None):
+        state["active"] = False
+
+    page.on_disconnect = on_disconnect
 
     page.title = "CVJFILAS - TV"
     page.theme_mode = ft.ThemeMode.DARK
@@ -306,20 +312,24 @@ def build_tv_view(page: ft.Page, db: DatabaseService) -> ft.View:
 
     async def blink():
         for _ in range(2):
+            if not state["active"]:
+                return
             atual_senha_txt.visible = False
             page.update()
             await asyncio.sleep(0.25)
 
+            if not state["active"]:
+                return
             atual_senha_txt.visible = True
             page.update()
             await asyncio.sleep(0.25)
 
-    ultimo_ticket_id = None
+    ultima_chamada = None
 
     async def refresh_loop():
-        nonlocal ultimo_ticket_id
+        nonlocal ultima_chamada
 
-        while True:
+        while state["active"] and (page.route or "").rstrip("/").lower() == "/tv":
             try:
                 today = date.today()
                 now = datetime.now()
@@ -362,8 +372,12 @@ def build_tv_view(page: ft.Page, db: DatabaseService) -> ft.View:
                     atual_nome_txt.value = nome
                     rodape_status_txt.value = "Senha em chamada"
 
-                    if mostrar_atual.get("id") != ultimo_ticket_id:
-                        ultimo_ticket_id = mostrar_atual.get("id")
+                    chamada_atual = (
+                        mostrar_atual.get("id"),
+                        mostrar_atual.get("_called_at_dt"),
+                    )
+                    if chamada_atual != ultima_chamada:
+                        ultima_chamada = chamada_atual
                         voice.speak_ticket(mostrar_atual)
                         await blink()
                 else:
@@ -379,6 +393,8 @@ def build_tv_view(page: ft.Page, db: DatabaseService) -> ft.View:
                 page.update()
 
             except Exception:
+                if not state["active"]:
+                    break
                 LOG.exception("Erro no refresh_loop da TV")
 
             await asyncio.sleep(2)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import json
+import logging
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Dict, List, Optional
@@ -12,6 +13,8 @@ from psycopg.types.json import Jsonb
 from dotenv import load_dotenv
 
 load_dotenv()
+
+LOG = logging.getLogger("CVJFILAS")
 
 
 def _env(name: str, default: str = "") -> str:
@@ -61,6 +64,7 @@ class DatabaseService:
             user=_env("PG_USER", "postgres"),
             password=_env("PG_PASS", ""),
         )
+        self._ensure_runtime_performance_objects()
 
     def _connect(self) -> psycopg.Connection:
         conn = psycopg.connect(
@@ -73,6 +77,68 @@ class DatabaseService:
         )
         conn.autocommit = False
         return conn
+
+    def _ensure_runtime_performance_objects(self) -> None:
+        statements = [
+            """
+            create table if not exists ticket_counter (
+              workday_id  bigint not null references workday(id) on delete cascade,
+              fila        char(1) not null check (fila in ('N','P','E','A')),
+              categoria   char(1) not null check (categoria in ('N','R')),
+              last_seq    integer not null default 0,
+              primary key (workday_id, fila, categoria)
+            )
+            """,
+            """
+            do $$
+            begin
+              if exists (
+                select 1
+                from pg_constraint
+                where conrelid = 'ticket_counter'::regclass
+                  and conname = 'ticket_counter_fila_check'
+                  and position(quote_literal('A') in pg_get_constraintdef(oid)) = 0
+              ) then
+                alter table ticket_counter
+                  drop constraint ticket_counter_fila_check;
+                alter table ticket_counter
+                  add constraint ticket_counter_fila_check
+                  check (fila in ('N','P','E','A'));
+              end if;
+            end
+            $$
+            """,
+            """
+            do $$
+            begin
+              if exists (
+                select 1
+                from pg_constraint
+                where conrelid = 'ticket'::regclass
+                  and conname = 'ticket_fila_check'
+                  and position(quote_literal('A') in pg_get_constraintdef(oid)) = 0
+              ) then
+                alter table ticket
+                  drop constraint ticket_fila_check;
+                alter table ticket
+                  add constraint ticket_fila_check
+                  check (fila in ('N','P','E','A'));
+              end if;
+            end
+            $$
+            """,
+            "create index if not exists idx_ticket_day_fila_seq on ticket(workday_id, fila, seq)",
+            "create extension if not exists pg_trgm",
+            "create index if not exists idx_consulente_nome_trgm on consulente using gin (lower(nome) gin_trgm_ops)",
+        ]
+        try:
+            with self._connect() as conn:
+                with conn.cursor() as cur:
+                    for statement in statements:
+                        cur.execute(statement)
+                conn.commit()
+        except Exception:
+            LOG.exception("Nao foi possivel garantir otimizacoes do banco")
 
     # -------------------------
     # Workday
@@ -119,20 +185,33 @@ class DatabaseService:
         map_f = {"N": 1, "P": 2, "E": 3, "A": 4}
         return workday_id * 10 + map_f.get(fila, 9)
 
-    def _next_seq_by_fila(self, cur: psycopg.Cursor, workday_id: int, fila: str) -> int:
+    def _next_seq_by_fila(
+        self,
+        cur: psycopg.Cursor,
+        workday_id: int,
+        fila: str,
+        categoria: str = "N",
+    ) -> int:
+        categoria = (categoria or "N").upper().strip()
+        if categoria not in ("N", "R"):
+            categoria = "N"
         lock_key = self._fila_lock_key(workday_id, fila)
         # trava por transação -> multi-terminal seguro
         cur.execute("select pg_advisory_xact_lock(%s)", (lock_key,))
         cur.execute(
             """
-            select coalesce(max(seq), 0) + 1 as next_seq
+            insert into ticket_counter (workday_id, fila, categoria, last_seq)
+            select %s, %s, %s, coalesce(max(seq), 0) + 1
             from ticket
-            where workday_id=%s and fila=%s
+            where workday_id=%s and fila=%s and categoria=%s
+            on conflict (workday_id, fila, categoria) do update set
+              last_seq = ticket_counter.last_seq + 1
+            returning last_seq
             """,
-            (workday_id, fila),
+            (workday_id, fila, categoria, workday_id, fila, categoria),
         )
         row = cur.fetchone()
-        return int(row["next_seq"])
+        return int(row["last_seq"])
 
     # -------------------------
     # Ticket CRUD
@@ -154,9 +233,9 @@ class DatabaseService:
                     """
                     select id, nome, documento, telefone, created_at
                     from consulente
-                    where nome ilike %s
+                    where lower(nome) like lower(%s)
                     order by
-                      case when nome ilike %s then 0 else 1 end,
+                      case when lower(nome) like lower(%s) then 0 else 1 end,
                       nome asc
                     limit %s
                     """,
@@ -222,6 +301,23 @@ class DatabaseService:
         ticket["acompanhantes"] = acompanhantes
         return ticket
 
+    def _fetch_ticket_by_id(
+        self, cur: psycopg.Cursor, ticket_id: int
+    ) -> Dict[str, Any] | None:
+        cur.execute(
+            """
+            select
+              id, workday_id, consulente_id, nome_livre, fila, categoria, seq, senha, status,
+              called_at, confirmed_at, finished_at, notes,
+              origin_device, offline_id, created_at, updated_at
+            from ticket
+            where id = %s
+            """,
+            (ticket_id,),
+        )
+        row = cur.fetchone()
+        return self._ticket_with_acompanhantes(row) if row else None
+
     def create_ticket(
         self,
         work_date: date,
@@ -260,7 +356,7 @@ class DatabaseService:
                     workday_id = int(wd["id"])
                     consulente = self._get_or_create_consulente(cur, nome)
 
-                    seq = self._next_seq_by_fila(cur, workday_id, fila)
+                    seq = self._next_seq_by_fila(cur, workday_id, fila, categoria)
                     senha = _senha_texto(fila, seq)
 
                     cur.execute(
@@ -339,7 +435,7 @@ class DatabaseService:
                 rows = cur.fetchall()
                 return [self._ticket_with_acompanhantes(r) for r in rows]
 
-    def call_ticket(self, ticket_id: int, origin_device: str = "") -> None:
+    def call_ticket(self, ticket_id: int, origin_device: str = "") -> Dict[str, Any]:
         with self._connect() as conn:
             try:
                 with conn.cursor() as cur:
@@ -352,9 +448,16 @@ class DatabaseService:
                     workday_id = int(row["workday_id"])
 
                     cur.execute(
-                        "update ticket set status='C', called_at=coalesce(called_at, now()) where id=%s",
+                        """
+                        update ticket
+                        set status='C',
+                            called_at=now(),
+                            updated_at=now()
+                        where id=%s
+                        """,
                         (ticket_id,),
                     )
+                    ticket = self._fetch_ticket_by_id(cur, ticket_id)
 
                     try:
                         cur.execute(
@@ -368,11 +471,12 @@ class DatabaseService:
                         pass
 
                 conn.commit()
+                return ticket
             except Exception:
                 conn.rollback()
                 raise
 
-    def confirm_ticket(self, ticket_id: int, origin_device: str = "") -> None:
+    def confirm_ticket(self, ticket_id: int, origin_device: str = "") -> Dict[str, Any]:
         with self._connect() as conn:
             try:
                 with conn.cursor() as cur:
@@ -385,9 +489,16 @@ class DatabaseService:
                     workday_id = int(row["workday_id"])
 
                     cur.execute(
-                        "update ticket set status='F', confirmed_at=coalesce(confirmed_at, now()) where id=%s",
+                        """
+                        update ticket
+                        set status='F',
+                            confirmed_at=coalesce(confirmed_at, now()),
+                            updated_at=now()
+                        where id=%s
+                        """,
                         (ticket_id,),
                     )
+                    ticket = self._fetch_ticket_by_id(cur, ticket_id)
 
                     try:
                         cur.execute(
@@ -401,11 +512,14 @@ class DatabaseService:
                         pass
 
                 conn.commit()
+                return ticket
             except Exception:
                 conn.rollback()
                 raise
 
-    def cancel_ticket(self, ticket_id: int, origin_device: str = "") -> None:
+    def cancel_ticket(
+        self, ticket_id: int, origin_device: str = ""
+    ) -> Dict[str, Any] | None:
         with self._connect() as conn:
             try:
                 with conn.cursor() as cur:
@@ -418,8 +532,10 @@ class DatabaseService:
                     workday_id = int(row["workday_id"])
 
                     cur.execute(
-                        "update ticket set status='X' where id=%s", (ticket_id,)
+                        "update ticket set status='X', updated_at=now() where id=%s",
+                        (ticket_id,),
                     )
+                    ticket = self._fetch_ticket_by_id(cur, ticket_id)
 
                     try:
                         cur.execute(
@@ -433,6 +549,7 @@ class DatabaseService:
                         pass
 
                 conn.commit()
+                return ticket
             except Exception:
                 conn.rollback()
                 raise
@@ -481,7 +598,9 @@ class DatabaseService:
                 conn.rollback()
                 raise
 
-    def move_ticket(self, ticket_id: int, nova_fila: str, origin_device: str = ""):
+    def move_ticket(
+        self, ticket_id: int, nova_fila: str, origin_device: str = ""
+    ) -> Dict[str, Any] | None:
         nova_fila = _fila_prefix(nova_fila)
 
         with self._connect() as conn:
@@ -509,13 +628,14 @@ class DatabaseService:
 
                     # evita mover para mesma fila
                     if fila_antiga == nova_fila:
-                        return
+                        return self._fetch_ticket_by_id(cur, ticket_id)
 
                     # calcula nova sequência segura
                     novo_seq = self._next_seq_by_fila(
                         cur,
                         workday_id,
                         nova_fila,
+                        row.get("categoria") or "N",
                     )
 
                     # gera nova senha
@@ -538,6 +658,7 @@ class DatabaseService:
                             ticket_id,
                         ),
                     )
+                    ticket = self._fetch_ticket_by_id(cur, ticket_id)
 
                     # registra evento (se existir tabela)
                     try:
@@ -578,6 +699,7 @@ class DatabaseService:
                         pass
 
                 conn.commit()
+                return ticket
 
             except Exception:
                 conn.rollback()
@@ -599,6 +721,10 @@ class DatabaseService:
                             "delete from ticket where workday_id=%s", (workday_id,)
                         )
                         affected = cur.rowcount
+                        cur.execute(
+                            "delete from ticket_counter where workday_id=%s",
+                            (workday_id,),
+                        )
                     else:
                         cur.execute(
                             "update ticket set status='X' where workday_id=%s and status <> 'X'",

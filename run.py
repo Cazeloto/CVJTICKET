@@ -10,6 +10,7 @@ from pathlib import Path
 IS_FROZEN = bool(getattr(sys, "frozen", False))
 
 if IS_FROZEN:
+    
     os.environ["FLET_FORCE_WEB_SERVER"] = "1"
     exe_dir = Path(sys.executable).resolve().parent
     server_log = open(exe_dir / "flet_server.log", "a", encoding="utf-8")
