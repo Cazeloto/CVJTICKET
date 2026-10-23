@@ -8,7 +8,7 @@ import flet as ft
 from services.database_service import DatabaseService
 
 LOG = logging.getLogger("CVJFILAS")
-TV_DESTAQUE_SEGUNDOS = 15
+TV_DESTAQUE_SEGUNDOS = 20
 
 
 def build_tv_view(page: ft.Page, db: DatabaseService) -> ft.View:
