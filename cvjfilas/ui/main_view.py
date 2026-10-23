@@ -128,12 +128,62 @@ def build_main_view(
 
         threading.Thread(target=worker, daemon=True).start()
 
-    # -------- Entrada única de nome --------
+    # -------- Entrada de nome com autocomplete --------
+    sugestoes_list = ft.ListView(spacing=0, visible=False)
+    autocomplete_overlay = ft.Container(
+        visible=False,
+        bgcolor=Colors.WHITE,
+        border=ft.border.all(1, Colors.OUTLINE_VARIANT),
+        border_radius=8,
+        shadow=ft.BoxShadow(blur_radius=8, color=Colors.BLACK12),
+        content=sugestoes_list,
+    )
+
+    def _hide_autocomplete():
+        autocomplete_overlay.visible = False
+        sugestoes_list.controls.clear()
+
+    def _pick_sugestao(nome: str):
+        nome_input.value = nome
+        _hide_autocomplete()
+        safe_page_update()
+
+    async def _on_nome_change(e):
+        termo = (nome_input.value or "").strip()
+        if len(termo) < 2:
+            _hide_autocomplete()
+            safe_page_update()
+            return
+        try:
+            resultados = await asyncio.to_thread(db.search_consulentes, termo)
+        except Exception:
+            return
+        if not resultados:
+            _hide_autocomplete()
+            safe_page_update()
+            return
+
+        sugestoes_list.controls = [
+            ft.Container(
+                padding=ft.padding.symmetric(horizontal=12, vertical=8),
+                ink=True,
+                on_click=lambda e, n=r["nome"]: _pick_sugestao(n),
+                content=ft.Text(r["nome"], size=13),
+                border=ft.border.only(
+                    bottom=ft.BorderSide(1, Colors.OUTLINE_VARIANT)
+                ) if idx < len(resultados) - 1 else None,
+            )
+            for idx, r in enumerate(resultados)
+        ]
+        autocomplete_overlay.visible = True
+        safe_page_update()
+
     nome_input = ft.TextField(
         label="Nome do consulente",
         hint_text="Digite o nome e clique na fila",
         expand=True,
         autofocus=True,
+        on_change=lambda e: page.run_task(_on_nome_change, e),
     )
 
     async def focus_nome_input_after_update():
@@ -950,6 +1000,7 @@ def build_main_view(
             )
             nome_input.value = ""
             acompanhantes_dd.value = "0"
+            _hide_autocomplete()
             append_created_ticket(t)
             show_snack(f"Senha gerada: {t.get('senha')} ({fila_label_ui(fila_code)})")
             if IS_SERVER and imprimir_ao_gerar.value:
@@ -974,6 +1025,20 @@ def build_main_view(
             on_click=lambda e: criar_na_fila(fila_code),
         )
 
+    # Stack: campo de nome + overlay de sugestões sobrepostas
+    nome_input_stack = ft.Stack(
+        expand=True,
+        controls=[
+            nome_input,
+            ft.Container(
+                top=44,
+                left=0,
+                right=0,
+                content=autocomplete_overlay,
+            ),
+        ],
+    )
+
     create_panel = ft.Container(
         padding=ft.padding.symmetric(horizontal=14, vertical=8),
         border_radius=8,
@@ -985,7 +1050,7 @@ def build_main_view(
             controls=[
                 ft.Icon(Icons.ADD_CIRCLE_OUTLINE, color=Colors.BLUE_900),
                 ft.Text("Nova senha", size=14, weight=FontWeight.W_800, width=92),
-                nome_input,
+                nome_input_stack,
                 acompanhantes_dd,
                 imprimir_ao_gerar,
                 criar_btn(
