@@ -1,3 +1,13 @@
+"""Views para dispositivos móveis do CVJTICKET.
+
+Três views:
+    build_mobile_home         — tela de menu inicial (não roteada diretamente)
+    build_mobile_registration — cadastro de consulentes nas filas
+    build_mobile_call         — chamada e controle das filas em tempo real
+
+Todas as operações de banco são executadas com asyncio.to_thread para não
+bloquear a event loop do Flet.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -83,6 +93,7 @@ def _ticket_name(ticket: dict) -> str:
 
 
 def build_mobile_home(page: ft.Page, db: DatabaseService, printer: PrintService) -> ft.View:
+    """Tela de menu inicial para acesso pelo celular (cadastrar ou chamar)."""
     _setup(page, "CVJTICKET no celular")
 
     def menu_card(title, subtitle, icon, color, route):
@@ -168,6 +179,7 @@ def build_mobile_home(page: ft.Page, db: DatabaseService, printer: PrintService)
 def build_mobile_registration(
     page: ft.Page, db: DatabaseService, printer: PrintService
 ) -> ft.View:
+    """View de cadastro de consulentes nas filas via dispositivo móvel."""
     _setup(page, "Cadastro de filas — CVJTICKET")
     busy = {"value": False}
 
@@ -276,6 +288,10 @@ def build_mobile_registration(
 
 
 def build_mobile_call(page: ft.Page, db: DatabaseService, printer: PrintService) -> ft.View:
+    """View de chamada e controle das filas em tempo real via dispositivo móvel.
+
+    Atualiza automaticamente a cada 3 s enquanto a rota /celular estiver ativa.
+    """
     _setup(page, "Chamada — CVJTICKET")
     state = {"queue": "P", "busy": False, "sharing": False, "active": True}
     page._mobile_call_session = state
@@ -564,16 +580,13 @@ def build_mobile_call(page: ft.Page, db: DatabaseService, printer: PrintService)
     def confirm_action(ticket: dict, action: str, title: str, message: str):
         dialog = ft.AlertDialog(modal=True, title=ft.Text(title), content=ft.Text(message))
         dialog.actions = [
-            ft.TextButton("Cancelar", on_click=lambda e: close_dialog(dialog)),
+            ft.TextButton("Cancelar", on_click=lambda e: page.pop_dialog()),
             ft.ElevatedButton(
                 "Confirmar",
                 on_click=lambda e: page.run_task(act, ticket, action, dialog),
             ),
         ]
         page.show_dialog(dialog)
-
-    def close_dialog(dialog):
-        page.pop_dialog()
 
     def ticket_card(ticket: dict):
         queue = str(ticket.get("fila") or "N").upper()

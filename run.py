@@ -1,3 +1,16 @@
+"""Ponto de entrada do CVJTICKET.
+
+Inicializa o logger, configura o ambiente de execução congelada (PyInstaller)
+e sobe o servidor Flet na porta configurada.
+
+Variáveis de ambiente relevantes:
+    APP_PORT  — porta HTTP (padrão: 8123, definida em cvjfilas/core/constants.py)
+
+Quando executado como .exe (IS_FROZEN=True):
+    - Força o modo web server (sem janela nativa)
+    - Redireciona stdout/stderr para flet_server.log no diretório do executável
+    - Abre o navegador automaticamente após 1,5 s
+"""
 from __future__ import annotations
 
 import os
@@ -10,7 +23,6 @@ from pathlib import Path
 IS_FROZEN = bool(getattr(sys, "frozen", False))
 
 if IS_FROZEN:
-    
     os.environ["FLET_FORCE_WEB_SERVER"] = "1"
     exe_dir = Path(sys.executable).resolve().parent
     server_log = open(exe_dir / "flet_server.log", "a", encoding="utf-8")
@@ -32,18 +44,19 @@ LOG = setup_logging(BASE_DIR)
 
 PORT = int(os.getenv("APP_PORT", str(APP_PORT)))
 
-LOG.info("BOOT CVJFILAS (modular)")
-LOG.info("Assets dir: %s (exists=%s)", str(ASSETS_DIR), ASSETS_DIR.exists())
-LOG.info("Host: 0.0.0.0")
+LOG.info("BOOT CVJTICKET")
+LOG.info("Assets dir: %s (exists=%s)", ASSETS_DIR, ASSETS_DIR.exists())
 LOG.info("Port: %s", PORT)
 
-def open_browser_once():
+
+def _open_browser() -> None:
+    """Aguarda 1,5 s e abre o navegador padrão apontando para o servidor local."""
     time.sleep(1.5)
     webbrowser.open(f"http://127.0.0.1:{PORT}")
 
 
 if IS_FROZEN:
-    threading.Thread(target=open_browser_once, daemon=True).start()
+    threading.Thread(target=_open_browser, daemon=True).start()
 
 ft.run(
     app,

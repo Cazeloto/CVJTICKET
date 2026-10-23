@@ -867,22 +867,6 @@ def build_main_view(
                     return lv, idx, lv.controls.pop(idx)
         return None, None, None
 
-    def insert_ticket_control(t: dict):
-        if state["call_started"]:
-            render_fila_from_cache(t.get("fila"), cadastro=False)
-            return None
-
-        control = cadastro_row(t) if not state["call_started"] else ticket_card(t)
-        lv = list_for_fila(t.get("fila"))
-        key = control_sort_key(control)
-        for idx, existing in enumerate(lv.controls):
-            if key < control_sort_key(existing):
-                lv.controls.insert(idx, control)
-                break
-        else:
-            lv.controls.append(control)
-        return control
-
     def apply_ticket_change(old_t: dict | None, new_t: dict | None):
         old_id = ticket_id(old_t) if old_t else ticket_id(new_t or {})
         old_fila = (old_t or {}).get("fila")
@@ -1692,9 +1676,6 @@ def build_main_view(
         by = {"N": [], "P": [], "E": [], "A": []}
         for t in items:
             by.get(t.get("fila", "N"), by["N"]).append(t)
-
-        def prio_status(s: str) -> int:
-            return {"C": 0, "W": 1, "F": 2, "D": 3, "X": 4}.get(s, 9)
 
         for f in ("N", "P", "E", "A"):
             by[f].sort(

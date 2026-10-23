@@ -1,3 +1,15 @@
+"""Roteador principal do CVJTICKET.
+
+Mapeia rotas Flet para as views correspondentes e trata erros de renderização
+exibindo uma tela de diagnóstico em vez de travar silenciosamente.
+
+Rotas suportadas:
+    /           → main_view  (desktop/operador)
+    /tv         → tv_view    (painel de chamada)
+    /celular    → mobile_call_view
+    /celular/chamada → mobile_call_view (alias para compatibilidade)
+    /celular/cadastro → mobile_registration_view
+"""
 from __future__ import annotations
 
 import logging
@@ -11,18 +23,19 @@ from .mobile_view import build_mobile_call, build_mobile_registration
 from .tv_view import build_tv_view
 
 
+def app(page: ft.Page) -> None:
+    """Ponto de entrada da aplicação Flet.
 
-def app(page: ft.Page):
+    Configura os handlers de rota e renderiza a view inicial.
+    """
     db = DatabaseService()
     printer = PrintService()
     log = logging.getLogger("CVJFILAS")
     log.info("APP iniciado. Route inicial=%s", page.route)
 
-    def render_error(title: str, ex: Exception):
+    def render_error(title: str, ex: Exception) -> None:
+        """Exibe uma tela de erro com traceback quando uma view falha ao renderizar."""
         import traceback
-
-        Colors = getattr(ft, "Colors", ft.Colors)
-        FontWeight = getattr(ft, "FontWeight", ft.FontWeight)
 
         tb = traceback.format_exc()
         log.error("%s: %s\n%s", title, ex, tb)
@@ -34,17 +47,12 @@ def app(page: ft.Page):
                 controls=[
                     ft.Container(
                         padding=20,
-                        bgcolor=Colors.BLACK,
+                        bgcolor=ft.Colors.BLACK,
                         content=ft.Column(
                             controls=[
-                                ft.Text(
-                                    title,
-                                    size=18,
-                                    weight=FontWeight.W_900,
-                                    color=Colors.RED,
-                                ),
-                                ft.Text(str(ex), color=Colors.WHITE),
-                                ft.Text(tb[-2500:], size=12, color=Colors.WHITE),
+                                ft.Text(title, size=18, weight=ft.FontWeight.W_900, color=ft.Colors.RED),
+                                ft.Text(str(ex), color=ft.Colors.WHITE),
+                                ft.Text(tb[-2500:], size=12, color=ft.Colors.WHITE),
                             ],
                             scroll=ft.ScrollMode.AUTO,
                         ),
@@ -54,13 +62,15 @@ def app(page: ft.Page):
         )
         page.update()
 
-    def route_change(e=None):
+    def route_change(e=None) -> None:
+        """Constrói e exibe a view correspondente à rota atual."""
         try:
+            # Normaliza: remove query string, trailing slash e converte para minúsculo
             raw = page.route or "/"
-            r = raw.split("?", 1)[0].rstrip("/") or "/"
-            route_key = r.lower()
+            route_key = raw.split("?", 1)[0].rstrip("/").lower() or "/"
 
             page.views.clear()
+
             if route_key == "/tv":
                 v = build_tv_view(page, db)
             elif route_key == "/celular/cadastro":
@@ -73,13 +83,15 @@ def app(page: ft.Page):
             page.views.append(v)
             page.update()
 
+            # Executa a corrotina de bootstrap da view, se existir
             boot = (getattr(v, "data", None) or {}).get("bootstrap")
             if boot:
                 page.run_task(boot)
         except Exception as ex:
             render_error("Falha ao renderizar", ex)
 
-    def view_pop(e: ft.ViewPopEvent):
+    def view_pop(e: ft.ViewPopEvent) -> None:
+        """Volta para a view anterior na pilha de navegação."""
         try:
             page.views.pop()
             top = page.views[-1]
